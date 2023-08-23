@@ -6,8 +6,60 @@ import {
 } from "@keplr-wallet/stores";
 import { RouteResponse } from "./types";
 import { simpleFetch } from "@keplr-wallet/simple-fetch";
-import { makeObservable } from "mobx";
+import { computed, makeObservable } from "mobx";
 import { CoinPretty } from "@keplr-wallet/unit";
+import Joi from "joi";
+
+const Schema = Joi.object<RouteResponse>({
+  source_asset_denom: Joi.string().required(),
+  source_asset_chain_id: Joi.string().required(),
+  dest_asset_denom: Joi.string().required(),
+  dest_asset_chain_id: Joi.string().required(),
+  amount_in: Joi.string().required(),
+  amount_out: Joi.string().required(),
+  operations: Joi.array()
+    .items(
+      Joi.object({
+        swap: Joi.object({
+          swap_in: {
+            swap_venue: Joi.object({
+              name: Joi.string().required(),
+              chain_id: Joi.string().required(),
+            }).required(),
+            swap_operations: Joi.array()
+              .items(
+                Joi.object({
+                  pool: Joi.string().required(),
+                  denom_in: Joi.string().required(),
+                  denom_out: Joi.string().required(),
+                })
+              )
+              .required(),
+            swap_amount_in: Joi.string().required(),
+          },
+          estimated_affiliate_fee: Joi.string().required(),
+        }).unknown(true),
+      }),
+      Joi.object({
+        transfer: Joi.object({
+          port: Joi.string().required(),
+          channel: Joi.string().required(),
+          chain_id: Joi.string().required(),
+          pfm_enabled: Joi.boolean(),
+          dest_denom: Joi.string().required(),
+          supports_memo: Joi.boolean(),
+        }).unknown(true),
+      })
+    )
+    .required(),
+  chain_ids: Joi.array().items(Joi.string()).required(),
+  does_swap: Joi.boolean(),
+  estimated_amount_out: Joi.string(),
+  swap_venue: Joi.object({
+    name: Joi.string().required(),
+    chain_id: Joi.string().required(),
+  }).required(),
+}).unknown(true);
 
 export class ObservableQueryRouteInner extends ObservableQuery<RouteResponse> {
   constructor(
@@ -24,6 +76,25 @@ export class ObservableQueryRouteInner extends ObservableQuery<RouteResponse> {
     super(sharedContext, skipURL, "/v1/fungible/route");
 
     makeObservable(this);
+  }
+
+  @computed
+  get outAmount(): CoinPretty {
+    if (!this.response) {
+      return new CoinPretty(
+        this.chainGetter
+          .getChain(this.destChainId)
+          .forceFindCurrency(this.destDenom),
+        "0"
+      );
+    }
+
+    return new CoinPretty(
+      this.chainGetter
+        .getChain(this.destChainId)
+        .forceFindCurrency(this.destDenom),
+      this.response.data.amount_out
+    );
   }
 
   protected override async fetchResponse(
@@ -45,9 +116,18 @@ export class ObservableQueryRouteInner extends ObservableQuery<RouteResponse> {
       signal: abortController.signal,
     });
 
+    const validated = Schema.validate(result.data);
+    if (validated.error) {
+      console.log(
+        "Failed to validate assets from source response",
+        validated.error
+      );
+      throw validated.error;
+    }
+
     return {
       headers: result.headers,
-      data: result.data,
+      data: validated.value,
     };
   }
 

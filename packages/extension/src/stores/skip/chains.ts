@@ -18,7 +18,7 @@ const Schema = Joi.object<ChainsResponse>({
       supports_memos: Joi.boolean(),
     }).unknown(true)
   ),
-});
+}).unknown(true);
 
 export class ObservableQueryChains extends ObservableQuery<ChainsResponse> {
   constructor(

@@ -1,19 +1,28 @@
-import { ChainGetter, QuerySharedContext } from "@keplr-wallet/stores";
+import { IChainStore, QuerySharedContext } from "@keplr-wallet/stores";
 import { DeepReadonly } from "utility-types";
 import { ObservableQueryAssetsFromSource } from "./assets-from-source";
 import { ObservableQueryRoute } from "./route";
 import { ObservableQueryChains } from "./chains";
 import { ObservableQueryIbcPfmTransfer } from "./ibc-pfm-transfer";
+import { ObservableQueryAssets } from "./assets";
+import { ObservableQueryIbcSwap } from "./ibc-swap";
 
 export class SkipQueries {
   public readonly queryChains: DeepReadonly<ObservableQueryChains>;
+  public readonly queryAssets: DeepReadonly<ObservableQueryAssets>;
   public readonly queryAssetsFromSource: DeepReadonly<ObservableQueryAssetsFromSource>;
   public readonly queryRoute: DeepReadonly<ObservableQueryRoute>;
 
   public readonly queryIBCPacketForwardingTransfer: DeepReadonly<ObservableQueryIbcPfmTransfer>;
+  public readonly queryIBCSwap: DeepReadonly<ObservableQueryIbcSwap>;
 
-  constructor(sharedContext: QuerySharedContext, chainGetter: ChainGetter) {
+  constructor(sharedContext: QuerySharedContext, chainGetter: IChainStore) {
     this.queryChains = new ObservableQueryChains(
+      sharedContext,
+      chainGetter,
+      "https://api.skip.money"
+    );
+    this.queryAssets = new ObservableQueryAssets(
       sharedContext,
       chainGetter,
       "https://api.skip.money"
@@ -33,6 +42,11 @@ export class SkipQueries {
       chainGetter,
       this.queryChains,
       this.queryAssetsFromSource
+    );
+    this.queryIBCSwap = new ObservableQueryIbcSwap(
+      chainGetter,
+      this.queryAssets,
+      "osmosis-1"
     );
   }
 }
